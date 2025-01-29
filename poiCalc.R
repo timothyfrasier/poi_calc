@@ -210,9 +210,11 @@ poi.ind <- function(microdata, freqs) {
       nAlleles[i] = sum(freqs$Locus == locusNames[i])
   }
   
+
   #-------------------------------------------#
   #        Calculate the POI                  #
   #-------------------------------------------#
+
   
   #-------------------------------------------#
   # This first matrix goes through the        #
@@ -220,29 +222,46 @@ poi.ind <- function(microdata, freqs) {
   # calculation for homozygotes, but replaces #
   # all other values with 1                   #
   #-------------------------------------------#
-  poiHomo = matrix(0, nrow = nInds, ncol = length(data2[1, ]))
+  poiHomo = matrix(NA, nrow = nInds, ncol = length(data2[1, ]))
   
   for (i in 1:nInds) {
       for (j in 1:length(data2[1, ])) {
-          if (data2[i, j] == 1) {
+          if (data2[i, j] == 1.0) {
               poiHomo[i, j] = (freqs[j, 3] * freqs[j, 3])
           } else {
-              poiHomo[i, j] = 1
+              poiHomo[i, j] = 999
           }
       }
   }
   
+  #----------------------------------#
+  #  Multiply Across Homozygous Loci #
+  #----------------------------------#
+  homo_product <- rep(NA, times = nInds)
+  for (i in 1:nInds) {
+    holder <- 1
+    for(j in 1:length(poiHomo[1, ])) {
+      if (poiHomo[i, j] < 999) {
+        holder <- holder * poiHomo[i, j]
+      } else {
+        holder <- holder * 1
+      }
+    }
+    homo_product[i] <- holder
+  }
+  
+  
   #------------------------------------------#
   # Get heterozygote frequencies             #
   #------------------------------------------#
-  poiHetero = matrix(0, nrow = nInds, ncol = length(data2[1, ]))
+  poiHetero = matrix(NA, nrow = nInds, ncol = length(data2[1, ]))
   
   for (i in 1:nInds) {
       for (j in 1:length(data2[1, ])) {
           if (data2[i, j] == 0.5) {
               poiHetero[i, j] = freqs[j, 3]
           } else {
-              poiHetero[i, j] = 1
+              poiHetero[i, j] = 999
           }
       }
   }
@@ -250,90 +269,46 @@ poi.ind <- function(microdata, freqs) {
   #--------------------------------------------#
   # Organize heterozygote information by locus #
   #--------------------------------------------#
-  poiHetero2 = matrix(0, nrow = nInds, ncol = (2 * nLoci))
+  poiHetero2 <- matrix(999, nrow = nInds, ncol = (2 * nLoci))
   
   for (i in 1:nInds) {
-      counter1 = 1
-      counter2 = 1
-      for (j in 1:nLoci) {
-          for (k in 1:nAlleles[j]) {
-              if (poiHetero[i, counter1] < 1) {
-                  poiHetero2[i, counter2] = poiHetero[i, counter1]
-                  counter1 = counter1 + 1
-                  counter2 = counter2 + 1
-              } else {
-                  if (data2[i, counter1] == 1.0) {
-                      poiHetero2[i, counter2] = 1
-                      poiHetero2[i, counter2 + 1] = 1
-                      counter1 = counter1 + 1
-                      counter2 = counter2 + 2
-                  } else {
-                      counter1 = counter1 + 1
-                  }
-              }
-          }
+    counter <- 1
+    for (j in 1:length(poiHetero[1, ])) {
+      if(poiHetero[i, j] < 999) {
+        poiHetero2[i, counter] <- poiHetero[i, j]
+        counter <- counter + 1
       }
+    }
   }
+  
 
     #-------------------------------------------#
     # Calculate appropriate heterozygote values #
     #-------------------------------------------#
-    poiHetero3 = matrix(0, nrow = nInds, ncol = nLoci)
-
+    hetero_product <- rep(NA, times = nInds)
+    
     for (i in 1:nInds) {
-        counter1 = 1
-        counter2 = 0
-        for(j in 1:nLoci) {
-            if (poiHetero2[i, ((counter1 * 2) - 1)] < 1.0) {
-                poiHetero3[i, j] = (2 * poiHetero2[i, ((counter1 * 2) - 1)] * poiHetero2[i, (counter1 * 2)])
-                counter1 = counter1 + 1
-            } else {
-                poiHetero3[i, j] = 1
-                counter1 = counter1 + 1
-            }
+      holder <- 1
+      for (j in seq(1, nLoci, 2)) {
+        if (poiHetero2[i, j] < 999) {
+          holder <- holder * (2 * poiHetero2[i, j] * poiHetero2[i, j + 1])
         }
+      }
+    hetero_product[i] <- holder
     }
-
-    #-------------------------------------#
-    # Multiply values across loci         #
-    #-------------------------------------#
-    poiTemp1 = rep(0, times = nInds)
-
-    for (i in 1:nInds) {
-        holder = 1
-        for (j in 1:length(data2[1, ])) {
-            holder = holder * poiHomo[i, j]
-        }
-        poiTemp1[i] = holder
-    }
-
-    poiTemp2 = rep(0, times = nInds)
-
-    for (i in 1:nInds) {
-        holder = 1
-        for (j in 1:nLoci) {
-            holder = holder * poiHetero3[i, j]
-        }
-        poiTemp2[i] = holder
-    }
-
-
+    
     #-------------------------------------#
     # Now, multiply together to get final #
     # POI value                           #
     #-------------------------------------#
-    poiFinal = rep(0, times = nInds)
-
-    for (i in 1:nInds) {
-        poiFinal[i] = poiTemp1[i] * poiTemp2[i]
-    }
+    poiFinal = homo_product * hetero_product
 
     #------------------------------------#
     # Combine the data to return to the  #
     # user                               #
     #------------------------------------#
-    names = microdata$nea
-    results = as.data.frame(cbind(names, poiFinal))
+    names = microdata[, 1]
+    results = data.frame(names, poiFinal)
     return(results)
 }  
 
@@ -378,7 +353,7 @@ poi.ind.sib <- function(microdata, freqs) {
     #-------------------------------------------#
     #        Calculate the POI                  #
     #-------------------------------------------#
-    poiHomo = matrix(0, nrow = nInds, ncol = length(data2[1, ]))
+    poiHomo = matrix(NA, nrow = nInds, ncol = length(data2[1, ]))
     
     #-------------------------------------------#
     # This first matrix goes through the        #
@@ -388,25 +363,41 @@ poi.ind.sib <- function(microdata, freqs) {
     #-------------------------------------------#
     for (i in 1:nInds) {
         for (j in 1:length(data2[1, ])) {
-            if (data2[i, j] == 1) {
+            if (data2[i, j] == 1.0) {
                 poiHomo[i, j] = ((1 + (2 * freqs[j, 3]) + (freqs[j, 3] * freqs[j, 3])) / 4)
             } else {
-                poiHomo[i, j] = 1
+                poiHomo[i, j] = 999
             }
         }
+    }
+    
+    #----------------------------------#
+    #  Multiply Across Homozygous Loci #
+    #----------------------------------#
+    homo_product <- rep(NA, times = nInds)
+    for (i in 1:nInds) {
+      holder <- 1
+      for(j in 1:length(poiHomo[1, ])) {
+        if (poiHomo[i, j] < 999) {
+          holder <- holder * poiHomo[i, j]
+        } else {
+          holder <- holder * 1
+        }
+      }
+      homo_product[i] <- holder
     }
     
     #------------------------------------------#
     # Get heterozygote frequencies             #
     #------------------------------------------#
-    poiHetero = matrix(0, nrow = nInds, ncol = length(data2[1, ]))
+    poiHetero = matrix(NA, nrow = nInds, ncol = length(data2[1, ]))
     
     for (i in 1:nInds) {
         for (j in 1:length(data2[1, ])) {
             if (data2[i, j] == 0.5) {
                 poiHetero[i, j] = freqs[j, 3]
             } else {
-                poiHetero[i, j] = 1
+                poiHetero[i, j] = 999
             }
         }
     }
@@ -415,73 +406,32 @@ poi.ind.sib <- function(microdata, freqs) {
     #--------------------------------------------#
     # Organize heterozygote information by locus #
     #--------------------------------------------#
-    poiHetero2 = matrix(0, nrow = nInds, ncol = (2 * nLoci))
+    poiHetero2 <- matrix(999, nrow = nInds, ncol = (2 * nLoci))
     
     for (i in 1:nInds) {
-        counter1 = 1
-        counter2 = 1
-        for (j in 1:nLoci) {
-            for (k in 1:nAlleles[j]) {
-                if (poiHetero[i, counter1] < 1) {
-                    poiHetero2[i, counter2] = poiHetero[i, counter1]
-                    counter1 = counter1 + 1
-                    counter2 = counter2 + 1
-                } else {
-                    if (data2[i, counter1] == 1.0) {
-                        poiHetero2[i, counter2] = 1
-                        poiHetero2[i, counter2 + 1] = 1
-                        counter1 = counter1 + 1
-                        counter2 = counter2 + 2
-                    } else {
-                        counter1 = counter1 + 1
-                    }
-                }
-            }
+      counter <- 1
+      for (j in 1:length(poiHetero[1, ])) {
+        if(poiHetero[i, j] < 999) {
+          poiHetero2[i, counter] <- poiHetero[i, j]
+          counter <- counter + 1
         }
+      }
     }
     
     
     #-------------------------------------------#
     # Calculate appropriate heterozygote values #
     #-------------------------------------------#
-    poiHetero3 = matrix(0, nrow = nInds, ncol = nLoci)
+    hetero_product <- rep(NA, times = nInds)
     
     for (i in 1:nInds) {
-        counter1 = 1
-        counter2 = 0
-        for(j in 1:nLoci) {
-            if (poiHetero2[i, ((counter1 * 2) - 1)] < 1.0) {
-                poiHetero3[i, j] = ((1 + poiHetero2[i, ((counter1 * 2) - 1)] + poiHetero2[i, (counter1 * 2)] + (2 * poiHetero2[i, ((counter1 * 2) - 1)] * poiHetero2[i, (counter1 * 2)])) / 4)
-                counter1 = counter1 + 1
-            } else {
-                poiHetero3[i, j] = 1
-                counter1 = counter1 + 1
-            }
+      holder <- 1
+      for (j in seq(1, nLoci, 2)) {
+        if (poiHetero2[i, j] < 999) {
+          holder <- holder * ((1 + poiHetero2[i, j] + poiHetero2[i, j + 1] + (2 * poiHetero2[i, j] * poiHetero2[i, j + 1])) / 4)
         }
-    }
-    
-    
-    #-------------------------------------#
-    # Multiply values across loci         #
-    #-------------------------------------#
-    poiTemp1 = rep(0, times = nInds)
-    
-    for (i in 1:nInds) {
-        holder = 1
-        for (j in 1:length(data2[1, ])) {
-            holder = holder * poiHomo[i, j]
-        }
-        poiTemp1[i] = holder
-    }
-    
-    poiTemp2 = rep(0, times = nInds)
-    
-    for (i in 1:nInds) {
-        holder = 1
-        for (j in 1:nLoci) {
-            holder = holder * poiHetero3[i, j]
-        }
-        poiTemp2[i] = holder
+      }
+      hetero_product[i] <- holder
     }
     
     
@@ -489,18 +439,14 @@ poi.ind.sib <- function(microdata, freqs) {
     # Now, multiply together to get final #
     # POI-sib value                       #
     #-------------------------------------#
-    poiFinal = rep(0, times = nInds)
-    
-    for (i in 1:nInds) {
-        poiFinal[i] = poiTemp1[i] * poiTemp2[i]
-    }
+    poiFinal = homo_product * hetero_product
     
     #------------------------------------#
     # Combine the data to return to the  #
     # user                               #
     #------------------------------------#
-    names = as.character(microdata$ID)
-    results = as.data.frame(cbind(names, poiFinal))
+    names = microdata[, 1]
+    results = data.frame(names, poiFinal)
     return(results)
 }
 
