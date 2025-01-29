@@ -11,8 +11,8 @@ First, load the **gstudio** package, and source the **poiCalc.R** script.
 `library(gstudio)`    
 `source("poiCalc.R")`    
 
-Read the data into **gstudio**. Note that this genotype file contains genotypes of 50 individuals genotyped at 17 microsatellite loci. The sample number is in column 1, and the genotypes are in columns 2-35. Note that missing data should first be indicated as NA.    
-`data <- read_population("genotypes.csv", type = "column", locus.columns = 2:35, sep = ",", header = TRUE)`    
+Read the data into **gstudio**. Note that this genotype file contains genotypes of 50 individuals genotyped at 18 microsatellite loci. The sample number is in column 1, and the genotypes are in columns 2-37. Note that missing data should first be indicated as NA.    
+`data <- read_population("genotypes.csv", type = "column", locus.columns = 2:37, sep = ",", header = TRUE)`    
 
 Get the allele frequency data.    
 `freqs <-  frequencies(data)`    
